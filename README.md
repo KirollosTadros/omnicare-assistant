@@ -149,7 +149,7 @@ The agent is told to answer coverage questions only from what `search_policy` re
 
 | Layer | What it does |
 |---|---|
-| Regex guard | A short list of patterns for obvious injection ("ignore previous instructions", "system prompt", "approve my claim", ...). A match is refused without calling the model. |
+| Regex guard | A short list of patterns for obvious injection ("ignore previous instructions", "system prompt", "developer mode", ...). A match is refused without calling the model. |
 | LLM guard | Everything else is classified as `safe`, `suspicious` or `injection` with structured output. A suspicious message gets one request to rephrase; a second one in a row is refused. |
 | History scrubbing | A refused message is replaced in the conversation with `[message removed by safety check]`, so the injected text is never shown to the agent on later turns. |
 | Confirmation | The yes/no before a claim is saved is parsed with plain string matching. No model reads that reply, so text sent at that step can't steer anything. |
@@ -286,7 +286,7 @@ The suite runs without a Gemini key. The agent tests use a fake chat model that 
 - **Conversations are kept in memory.** `InMemorySaver` loses them when the backend restarts. `SqliteSaver` or `PostgresSaver` is a one-line swap.
 - **Claims are stored in a JSON file** with a lock. That is fine for a prototype with one backend process, not for concurrent writers.
 - **A reply sent while a confirmation is pending is only read as yes or no.** If the user types something else, the claim is cancelled and they have to ask again. That is deliberate: it keeps the model out of the confirmation step.
-- **The regex guard is blunt.** A legitimate message that contains one of its phrases is refused. I preferred a false refusal to a missed injection.
+- **The regex guard is narrow on purpose.** It only matches phrases with no innocent reading, such as "ignore previous instructions" or "system prompt". Requests to approve or change a claim are left to the LLM guard, and to the fact that no tool can change a claim.
 - **The claim tools could be exposed through MCP** so other agents can reuse them. They are already plain functions with no framework imports.
 - **Voice is turn-based.** Real-time voice would use LiveKit or Pipecat.
 - **Submitted claims live in a Docker volume**, so they survive restarts and never change the files in the repo. `docker compose down -v` resets them.

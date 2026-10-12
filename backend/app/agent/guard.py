@@ -14,18 +14,14 @@ log = logging.getLogger(__name__)
 MAX_GUARD_ROUNDS = 1
 
 INJECTION_PATTERNS = [
-    r"\b(ignore|disregard)\b.{0,30}\b(instructions?|rules|prompts?)\b",
+    r"\b(ignore|disregard)\b.{0,30}\b(instructions?|prompts?)\b",
     r"\bforget\b.{0,20}\b(previous|prior|above|all|your)\b.{0,20}\b(instructions?|rules)\b",
     r"\byou are now\b",
     r"\bsystem prompt\b",
     r"\bdeveloper mode\b",
     r"\b(reveal|show|print|repeat)\b.{0,20}\byour (instructions|prompt|rules)\b",
-    r"\bact as\b",
     r"\bpretend (to be|you are)\b",
     r"\bjailbreak\b",
-    r"\bapprove (this |my |the )?claim\b",
-    r"\b(set|change|update) (the |my |its )?status\b",
-    r"\bmark\b.{0,30}\bas (approved|paid)\b",
 ]
 INJECTION_REGEX = re.compile("|".join(INJECTION_PATTERNS), re.IGNORECASE)
 
