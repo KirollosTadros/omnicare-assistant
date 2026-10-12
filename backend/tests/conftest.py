@@ -7,7 +7,7 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.runnables import RunnableLambda
 
 from app import config
-from app.agent import assistant, guard
+from app.agent import assistant, guard, llm
 from app.agent.graph import build_graph
 from app.rag import ingest
 
@@ -58,6 +58,8 @@ def temp_data(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CHROMA_DIR", tmp_path / "chroma")
     monkeypatch.setattr(config, "POLICY_DIR", DATA_DIR)
     ingest.get_store.cache_clear()
+    # no test asks Gemini for its model list, even when a real key is set
+    monkeypatch.setattr(llm, "fetch_models", lambda: [llm.DEFAULT_MODEL])
     yield
     ingest.get_store.cache_clear()
 

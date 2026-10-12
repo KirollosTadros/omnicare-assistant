@@ -6,7 +6,8 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
 from app import config, voice
-from app.main import app, get_graph_builder
+from app.agent import llm
+from app.main import app, get_graph_builder, is_cited
 
 CLAIM_ARGS = {
     "policy_number": "POL-1092",
@@ -67,6 +68,43 @@ def test_chat_rejects_invalid_requests(scripted_client, body):
     assert response.status_code == 422
 
 
+def test_models_without_api_key_returns_only_the_default(client, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    body = client.get("/api/v1/models").json()
+
+    assert body == {"models": [llm.DEFAULT_MODEL], "default": llm.DEFAULT_MODEL}
+
+
+def test_models_come_from_the_api_when_a_key_is_set(client, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(llm, "fetch_models", lambda: ["gemini-9-flash", "gemini-9-pro"])
+
+    assert client.get("/api/v1/models").json()["models"] == ["gemini-9-flash", "gemini-9-pro"]
+
+
+def test_models_fall_back_to_the_default_when_the_fetch_fails(client, monkeypatch):
+    def broken_fetch():
+        raise RuntimeError("no network")
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(llm, "fetch_models", broken_fetch)
+
+    assert client.get("/api/v1/models").json()["models"] == [llm.DEFAULT_MODEL]
+
+
+def test_chat_accepts_a_model_from_the_fetched_list(scripted_client, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(llm, "fetch_models", lambda: ["gemini-9-flash"])
+    client = scripted_client([AIMessage("Hello!")])
+
+    accepted = client.post("/api/v1/chat", json={"user_id": new_user(), "message": "hi", "model": "gemini-9-flash"})
+    rejected = client.post("/api/v1/chat", json={"user_id": new_user(), "message": "hi", "model": "gemini-0-other"})
+
+    assert accepted.status_code == 200
+    assert rejected.status_code == 422
+
+
 def test_chat_without_api_key_returns_503(client, monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
@@ -86,6 +124,18 @@ def test_chat_returns_502_when_the_model_fails(client):
 
     assert response.status_code == 502
     assert "secret" not in response.text
+
+
+def test_chat_returns_429_when_the_rate_limit_is_hit(client):
+    def limited_builder(model):
+        raise RuntimeError("429 RESOURCE_EXHAUSTED. You exceeded your current quota")
+
+    app.dependency_overrides[get_graph_builder] = lambda: limited_builder
+
+    response = client.post("/api/v1/chat", json={"user_id": "usr_123", "message": "hello"})
+
+    assert response.status_code == 429
+    assert "rate limit" in response.json()["detail"]
 
 
 def test_chat_response_shape(scripted_client):
@@ -136,6 +186,23 @@ def test_chat_returns_all_retrieved_sections_when_none_is_cited(scripted_client,
     body = client.post("/api/v1/chat", json={"user_id": new_user(), "message": "Is earthquake damage covered?"}).json()
 
     assert len(body["sources"]) == 2
+
+
+@pytest.mark.parametrize(
+    "section, response, expected",
+    [
+        ("Section 1: Home Water Damage Coverage", "Covered [Section 1: Home Water Damage Coverage].", True),
+        ("Section 1: Home Water Damage Coverage", "Covered, see section 1.", True),
+        ("Section 1: Home Water Damage Coverage", "Covered [Section 12: Travel].", False),
+        ("Article 4 - Theft", "Theft is covered [Article 4 - Theft].", True),
+        ("Exclusions", "This is listed under [Exclusions].", True),
+        ("chunk 3", "It is covered [chunk 3].", True),
+        ("chunk 3", "It is covered [chunk 31].", False),
+        ("Exclusions", "I don't know based on the policy document.", False),
+    ],
+)
+def test_citation_matching_does_not_depend_on_the_heading_format(section, response, expected):
+    assert is_cited(section, response) is expected
 
 
 def test_claim_submission_waits_for_confirmation_then_executes(scripted_client):

@@ -21,7 +21,7 @@ class textEmbedding:
             chunks.append(" ".join(chunk_words))
         return chunks
 
-    def markdownChunker(self, text: str, source: str, max_words: int= 300) -> List[dict]:
+    def markdownChunker(self, text: str, source: str, chunk_size: int= 100, overlap: int= 25) -> List[dict]:
 
         title = ""
         sections = []
@@ -38,7 +38,7 @@ class textEmbedding:
             body = "\n".join(lines).strip()
             # the heading is embedded with the body so its words help retrieval
             prefix = f"{title} — {heading}" if title else heading
-            pieces = [body] if len(body.split()) <= max_words else self.wordChunker(body)
+            pieces = [body] if len(body.split()) <= chunk_size else self.wordChunker(body, chunk_size, overlap)
             for piece in pieces:
                 chunks.append({"text": f"{prefix}\n{piece}", "section": heading, "source": source})
         return chunks

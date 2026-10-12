@@ -27,7 +27,9 @@ def load_chunks(policy_dir: Path) -> list[dict]:
     for path in sorted(Path(policy_dir).iterdir()):
         suffix = path.suffix.lower()
         if suffix == ".md":
-            file_chunks = embedder.markdownChunker(MarkdownReader(path).extract_text(), source=path.name)
+            file_chunks = embedder.markdownChunker(
+                MarkdownReader(path).extract_text(), path.name, config.CHUNK_SIZE, config.CHUNK_OVERLAP
+            )
             headings, part = [], 0
             for chunk in file_chunks:
                 # a long section is split into several pieces that share one heading
@@ -38,7 +40,7 @@ def load_chunks(policy_dir: Path) -> list[dict]:
                     part += 1
                 chunk["id"] = f"{path.name}::section-{len(headings)}" + (f"-part-{part}" if part > 1 else "")
         elif suffix == ".pdf":
-            pieces = embedder.wordChunker(PDFReader(path).extract_text())
+            pieces = embedder.wordChunker(PDFReader(path).extract_text(), config.CHUNK_SIZE, config.CHUNK_OVERLAP)
             file_chunks = [
                 {"text": piece, "section": f"chunk {i}", "source": path.name, "id": f"{path.name}::chunk-{i}"}
                 for i, piece in enumerate(pieces, start=1)

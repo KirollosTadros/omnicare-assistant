@@ -15,8 +15,6 @@ YES_ANSWERS = ["yes", "y", "confirm", "ok", "okay", "sure", "submit"]
 
 
 def skip_tools(tool_calls: list[dict], status: str, reason: str) -> Command:
-    # every tool call needs a ToolMessage before the model is called again,
-    # including calls made in the same turn as the claim
     messages = []
     for call in tool_calls:
         is_claim = call["name"] == "submit_claim"
@@ -33,7 +31,6 @@ def skip_tools(tool_calls: list[dict], status: str, reason: str) -> Command:
 
 def confirm_claim(state: AssistantState) -> Command[Literal["tools", "agent"]]:
     # this node runs again from the top on resume. Everything before the interrupt is
-    # deterministic validation with no LLM call, so the second run asks the same question.
     tool_calls = state["messages"][-1].tool_calls
     submissions = [call for call in tool_calls if call["name"] == "submit_claim"]
 
@@ -60,7 +57,6 @@ def confirm_claim(state: AssistantState) -> Command[Literal["tools", "agent"]]:
         }
     )
 
-    # plain string matching, no LLM: text sent at this step can't steer anything
     if str(answer).strip().strip(".!").lower() in YES_ANSWERS:
         log.info("[confirm_claim] confirmed")
         return Command(goto="tools")

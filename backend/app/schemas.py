@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
-from app.agent.llm import AVAILABLE_MODELS
+from app.agent import llm
 
 
 class ChatRequest(BaseModel):
@@ -13,8 +13,8 @@ class ChatRequest(BaseModel):
     @field_validator("model")
     @classmethod
     def known_model(cls, value: str | None) -> str | None:
-        if value is not None and value not in AVAILABLE_MODELS:
-            raise ValueError(f"model must be one of: {', '.join(AVAILABLE_MODELS)}")
+        if value is not None and value not in llm.list_models():
+            raise ValueError(f"model must be one of: {', '.join(llm.list_models())}")
         return value
 
 
@@ -29,6 +29,11 @@ class ChatResponse(BaseModel):
     response: str
     sources: list[str]
     tool_calls: list[ToolCallInfo]
+
+
+class ModelsResponse(BaseModel):
+    models: list[str]
+    default: str
 
 
 class TranscriptResponse(BaseModel):

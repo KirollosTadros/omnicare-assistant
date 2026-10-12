@@ -6,16 +6,20 @@ import streamlit as st
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
 
-# same list as AVAILABLE_MODELS in backend/app/agent/llm.py
-AVAILABLE_MODELS = [
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.6-flash",
-    "gemini-3.7-flash",
-    "gemini-3.8-flash",
-    "gemini-3.1-pro-preview",
-]
-DEFAULT_MODEL = "gemini-3.5-flash-lite"
+@st.cache_data(ttl=300)
+def fetch_models() -> dict:
+    response = requests.get(f"{BACKEND_URL}/api/v1/models", timeout=15)
+    response.raise_for_status()
+    return response.json()
+
+
+def available_models() -> tuple[list[str], str]:
+    # a failed request raises inside fetch_models, so it is not cached
+    try:
+        data = fetch_models()
+        return data["models"], data["default"]
+    except (requests.RequestException, ValueError, KeyError):
+        return [], ""
 
 
 def backend_online() -> bool:
@@ -122,7 +126,10 @@ st.session_state.setdefault("recording_key", 0)
 st.session_state.setdefault("autoplay", False)
 
 with st.sidebar:
-    st.session_state.model = st.selectbox("Model", AVAILABLE_MODELS, index=AVAILABLE_MODELS.index(DEFAULT_MODEL))
+    models, default_model = available_models()
+    default_index = models.index(default_model) if default_model in models else 0
+    # with no list (backend offline) nothing is selected and the backend uses its own default
+    st.session_state.model = st.selectbox("Model", models, index=default_index if models else None)
     st.session_state.mode = st.radio("Mode", ["Chat", "Voice"], horizontal=True)
     base_user_id = st.text_input("User ID", value="usr_123").strip()
 

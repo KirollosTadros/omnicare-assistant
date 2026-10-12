@@ -14,6 +14,10 @@ CHROMA_DIR = Path(os.getenv("CHROMA_DIR", BACKEND_DIR / "chroma"))
 
 COLLECTION_NAME = "policy_collection"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+
+# all-MiniLM-L6-v2 only reads about 256 tokens, so chunks are kept well under that
+CHUNK_SIZE = 100
+CHUNK_OVERLAP = 25
 GUARD_MODEL = os.getenv("GUARD_MODEL", "gemini-3.5-flash-lite")
 
 MAX_AUDIO_BYTES = 10 * 1024 * 1024

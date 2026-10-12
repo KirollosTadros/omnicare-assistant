@@ -23,11 +23,44 @@ def test_markdown_chunker_makes_one_chunk_per_section():
 
 
 def test_markdown_chunker_splits_long_sections_and_keeps_the_heading():
-    text = "# Title\n\n## Long Section\n\n" + " ".join(["word"] * 700)
+    words = [f"w{i}" for i in range(250)]
+    text = "# Title\n\n## Long Section\n\n" + " ".join(words) + "\n\n## Short Section\n\nA few words."
     chunks = ingest.get_embedder().markdownChunker(text, source="long.md")
 
-    assert len(chunks) > 1
-    assert {chunk["section"] for chunk in chunks} == {"Long Section"}
+    assert [chunk["section"] for chunk in chunks] == ["Long Section"] * 4 + ["Short Section"]
+    bodies = [chunk["text"].split("\n", 1)[1].split() for chunk in chunks[:4]]
+    assert bodies[0] == words[:100]
+    assert bodies[1] == words[75:175]
+    assert all(len(body) <= 100 for body in bodies)
+    assert all(chunk["text"].startswith("Title — Long Section\n") for chunk in chunks[:4])
+
+
+def test_long_sections_and_pdfs_use_the_configured_chunk_size(tmp_path, monkeypatch):
+    (tmp_path / "long.md").write_text("# Title\n\n## Long Section\n\n" + " ".join(["word"] * 250))
+    (tmp_path / "extra.pdf").write_bytes(b"%PDF-1.4")
+
+    class FakePDFReader:
+        def __init__(self, file_path):
+            pass
+
+        def extract_text(self):
+            return " ".join(["word"] * 250)
+
+    monkeypatch.setattr(ingest, "PDFReader", FakePDFReader)
+
+    chunks = ingest.load_chunks(tmp_path)
+
+    assert [chunk["id"] for chunk in chunks] == [
+        "extra.pdf::chunk-1",
+        "extra.pdf::chunk-2",
+        "extra.pdf::chunk-3",
+        "extra.pdf::chunk-4",
+        "long.md::section-1",
+        "long.md::section-1-part-2",
+        "long.md::section-1-part-3",
+        "long.md::section-1-part-4",
+    ]
+    assert all(len(chunk["text"].split()) <= config.CHUNK_SIZE + 10 for chunk in chunks)
 
 
 def test_readers_check_the_file_extension():

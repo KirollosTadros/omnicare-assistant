@@ -57,7 +57,6 @@ def test_submit_valid_claim_appends_a_record():
 
     assert result["confirmation_id"] == "CLM-9015"
     assert result["status"] == "Submitted"
-    assert "note" not in result
 
     after = stored_claims()
     assert len(after) == 3
@@ -115,8 +114,8 @@ def test_amount_is_rounded_to_two_decimals():
     assert submit_claim(**{**VALID, "amount": 99.999})["amount"] == 100.0
 
 
-def test_amount_above_the_section_limit_is_accepted_with_a_note():
+def test_amount_above_the_policy_limit_is_still_accepted():
     result = submit_claim(**{**VALID, "claim_type": "Personal Property", "amount": 12000})
 
     assert result["confirmation_id"] == "CLM-9015"
-    assert "$10,000" in result["note"]
+    assert result["amount"] == 12000.0

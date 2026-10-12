@@ -12,16 +12,48 @@ It refuses prompt-injection attempts before they reach the agent. The stack is a
 
 ## Quick start
 
-You need Docker and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+You need Docker with Compose and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+
+**1. Add your API key**
 
 ```bash
-cp .env.example .env        # then put your key in GEMINI_API_KEY
-docker compose up --build
+cp .env.example .env
 ```
 
-Open **http://localhost:8501**. The API is on **http://localhost:8000** (`/docs` for the OpenAPI page).
+Open `.env` and put your key in `GEMINI_API_KEY`.
 
-The first build downloads torch and the embedding model, so it takes a while. Later starts are fast.
+**2. Build the images**
+
+```bash
+docker compose build
+```
+
+The first build downloads torch and the embedding model, so it takes a while. Later builds reuse those layers and take seconds.
+
+**3. Start the app**
+
+```bash
+docker compose up -d
+```
+
+The frontend waits until the backend reports healthy, which takes about half a minute.
+
+**4. Open it**
+
+- UI: **http://localhost:8501**
+- API: **http://localhost:8000** (`/docs` for the OpenAPI page)
+
+Steps 2 and 3 can be done in one go with `docker compose up --build`.
+
+Other commands:
+
+| Command | What it does |
+|---|---|
+| `docker compose ps` | Shows whether both containers are up and the backend is healthy |
+| `docker compose logs -f backend` | Follows the backend log, including the `[guard]`, `[agent]` and `[confirm_claim]` lines |
+| `docker compose down` | Stops the app. Submitted claims are kept |
+| `docker compose down -v` | Stops the app and resets the claims file and the index to what ships in the repo |
+| `docker compose up -d --build` | Rebuilds after a code change and restarts |
 
 ---
 
@@ -100,12 +132,12 @@ One rule from Research-AI carries over: on resume, LangGraph re-runs the interru
 
 ## RAG design
 
-- **Section-based chunking.** The policy is two short sections. Fixed-size word chunks would merge them into one chunk, and a citation to "the whole document" means nothing. `markdownChunker` makes one chunk per `##` heading, and falls back to the word chunker inside a section longer than about 300 words.
+- **Section-based chunking.** The policy is two short sections. Fixed-size word chunks would merge them into one chunk, and a citation to "the whole document" means nothing. `markdownChunker` makes one chunk per `##` heading. A section longer than 100 words is split into 100-word pieces with a 25-word overlap, and every piece keeps the section's heading. The size is small on purpose: `all-MiniLM-L6-v2` only reads about 256 tokens, so a larger chunk would be partly ignored by the embedding.
 - **The heading is embedded with the body** (`<document title> — <section heading>\n<body>`), so a question that uses the heading's words still finds the section.
 - **Local embeddings.** `all-MiniLM-L6-v2` through sentence-transformers, baked into the image. No embedding API, no cost.
 - **Chroma** with cosine distance, rebuilt at every backend start. The files are tiny, so rebuilding is simpler than tracking changes and is always correct.
 - **Citations come from metadata, not from the model.** Each chunk is stored with `section` and `source`. `search_policy` returns the text to the model and the metadata as a tool artifact. The API reads the artifacts and fills `sources`, keeping only the sections the answer cites.
-- **PDFs work too.** Ingestion picks the reader by file extension, so a policy PDF dropped into `backend/data/` is indexed with the word chunker without code changes. Only `sample_policy.md` ships with the repo.
+- **PDFs work too.** Ingestion picks the reader by file extension, so a policy PDF dropped into `backend/data/` is indexed with the same 100/25 word chunker without code changes. Only `sample_policy.md` ships with the repo.
 
 The agent is told to answer coverage questions only from what `search_policy` returns, and to say "I don't know based on the policy document" when the sections don't contain the answer.
 
@@ -132,10 +164,11 @@ Writes to `mock_claims.json` go through a lock and a temp file that is swapped i
 |---|---|
 | `GET /api/v1/health` | Returns `{"status": "healthy"}`. Works without an API key. |
 | `POST /api/v1/chat` | One conversation turn. |
+| `GET /api/v1/models` | The Gemini chat models the API key can use, and the default one. Fetched from the Gemini API once and cached; without a key or network it returns only the default model from `.env`. |
 | `POST /api/v1/voice/transcribe` | Multipart audio upload (`file`), returns `{"text": "..."}`. |
 | `POST /api/v1/voice/speak` | `{"text": "..."}`, returns `audio/mpeg`. |
 
-Chat request. `model` is optional:
+Chat request. `model` is optional and must be one of the models returned by `/api/v1/models`:
 
 ```json
 { "user_id": "usr_123", "message": "Is water damage from a burst pipe covered?", "model": "gemini-3.5-flash-lite" }
@@ -160,7 +193,7 @@ Chat response:
 
 The response text above is an example; the exact wording depends on the model. A tool call's `status` is `executed`, `awaiting_confirmation`, `cancelled` or `rejected`.
 
-Errors: `422` for an invalid request, `503` when `GEMINI_API_KEY` is missing, `502` when the model call fails.
+Errors: `422` for an invalid request, `503` when `GEMINI_API_KEY` is missing, `429` when the Gemini rate limit is reached, `502` when the model call fails for another reason.
 
 ### curl examples
 

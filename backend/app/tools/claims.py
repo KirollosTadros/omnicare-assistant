@@ -12,7 +12,6 @@ from app import config
 
 CLAIM_ID_PATTERN = re.compile(r"^CLM-\d{4,}$")
 CLAIM_TYPES = ["Water Damage", "Personal Property"]
-SECTION_LIMITS = {"Water Damage": 25_000, "Personal Property": 10_000}
 FIELD_HINTS = {
     "policy_number": "must look like POL-1234 (POL- followed by 4 digits)",
     "claim_type": "must be Water Damage or Personal Property",
@@ -101,14 +100,10 @@ def submit_claim(policy_number: str, claim_type: str, amount: float, description
             json.dump(claims, file, indent=2)
         os.replace(temp_path, config.CLAIMS_FILE)
 
-    result = {
+    return {
         "confirmation_id": record["claim_id"],
         "status": "Submitted",
         "policy_number": claim.policy_number,
         "claim_type": claim.claim_type,
         "amount": claim.amount,
     }
-    limit = SECTION_LIMITS[claim.claim_type]
-    if claim.amount > limit:
-        result["note"] = f"The amount is above the ${limit:,} coverage limit for {claim.claim_type}."
-    return result

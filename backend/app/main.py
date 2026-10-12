@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
@@ -11,9 +12,9 @@ from langgraph.types import Command
 
 from app import config, voice
 from app.agent.graph import build_graph
-from app.agent.llm import DEFAULT_MODEL
+from app.agent.llm import DEFAULT_MODEL, list_models
 from app.rag import ingest
-from app.schemas import ChatRequest, ChatResponse, SpeakRequest, ToolCallInfo, TranscriptResponse
+from app.schemas import ChatRequest, ChatResponse, ModelsResponse, SpeakRequest, ToolCallInfo, TranscriptResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -66,6 +67,12 @@ def collect_tool_calls(messages: list[AnyMessage], new_messages: list[AnyMessage
     return tool_calls
 
 
+def is_cited(section: str, response: str) -> bool:
+    # a heading written as "Label: Title" also counts as cited when only its label is used
+    label = section.split(":")[0].strip()
+    return re.search(rf"{re.escape(label)}(?!\w)", response, re.IGNORECASE) is not None
+
+
 def collect_sources(new_messages: list[AnyMessage], response: str) -> list[str]:
     retrieved = []
     for message in new_messages:
@@ -74,8 +81,7 @@ def collect_sources(new_messages: list[AnyMessage], response: str) -> list[str]:
                 if source not in retrieved:
                     retrieved.append(source)
 
-    # "Section 1" on its own also counts as citing "Section 1: Home Water Damage Coverage"
-    cited = [s for s in retrieved if s["section"] in response or s["section"].split(":")[0] in response]
+    cited = [source for source in retrieved if is_cited(source["section"], response)]
     return [f"{s['source']} — {s['section']}" for s in cited or retrieved]
 
 
@@ -114,6 +120,11 @@ def health() -> dict:
     return {"status": "healthy"}
 
 
+@app.get("/api/v1/models", response_model=ModelsResponse)
+def models() -> ModelsResponse:
+    return ModelsResponse(models=list_models(), default=DEFAULT_MODEL)
+
+
 @app.post("/api/v1/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, builder=Depends(get_graph_builder)) -> ChatResponse:
     model = request.model or DEFAULT_MODEL
@@ -121,8 +132,10 @@ async def chat(request: ChatRequest, builder=Depends(get_graph_builder)) -> Chat
     try:
         graph = builder(model)
         return await run_in_threadpool(run_turn, graph, request.user_id, request.message)
-    except Exception:
+    except Exception as error:
         log.exception("[chat] request failed")
+        if "RESOURCE_EXHAUSTED" in str(error):
+            raise HTTPException(429, "The Gemini rate limit was reached. Wait a minute or choose another model.")
         raise HTTPException(502, "The language model request failed. Please try again in a moment.")
 
 
