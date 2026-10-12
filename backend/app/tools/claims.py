@@ -30,6 +30,13 @@ class ClaimSubmission(BaseModel):
     amount: float = Field(strict=True, gt=0, le=1_000_000)
     description: str = Field(min_length=10, max_length=1000)
 
+    @field_validator("policy_number", mode="before")
+    @classmethod
+    def normalise_policy_number(cls, value):
+        if isinstance(value, str):
+            return value.strip().upper()
+        return value
+
     @field_validator("claim_type", mode="before")
     @classmethod
     def normalise_claim_type(cls, value):

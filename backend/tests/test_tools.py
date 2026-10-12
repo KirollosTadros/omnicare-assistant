@@ -110,6 +110,13 @@ def test_claim_type_is_case_insensitive():
     assert stored_claims()[2]["claim_type"] == "Water Damage"
 
 
+def test_policy_number_is_case_insensitive():
+    result = submit_claim(**{**VALID, "policy_number": " pol-1092 "})
+
+    assert result["policy_number"] == "POL-1092"
+    assert stored_claims()[2]["policy_number"] == "POL-1092"
+
+
 def test_amount_is_rounded_to_two_decimals():
     assert submit_claim(**{**VALID, "amount": 99.999})["amount"] == 100.0
 
