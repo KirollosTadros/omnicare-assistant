@@ -3,15 +3,17 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import Response
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langgraph.types import Command
 
+from app import config, voice
 from app.agent.graph import build_graph
 from app.agent.llm import DEFAULT_MODEL
 from app.rag import ingest
-from app.schemas import ChatRequest, ChatResponse, ToolCallInfo
+from app.schemas import ChatRequest, ChatResponse, SpeakRequest, ToolCallInfo, TranscriptResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -122,3 +124,38 @@ async def chat(request: ChatRequest, builder=Depends(get_graph_builder)) -> Chat
     except Exception:
         log.exception("[chat] request failed")
         raise HTTPException(502, "The language model request failed. Please try again in a moment.")
+
+
+@app.post("/api/v1/voice/transcribe", response_model=TranscriptResponse)
+async def transcribe(file: UploadFile) -> TranscriptResponse:
+    # browsers send types like "audio/webm;codecs=opus"
+    mime_type = (file.content_type or "").split(";")[0].strip().lower()
+    if mime_type not in config.AUDIO_TYPES:
+        raise HTTPException(415, "Unsupported audio type. Use audio/wav, audio/webm or audio/mpeg.")
+
+    audio = await file.read(config.MAX_AUDIO_BYTES + 1)
+    if not audio:
+        raise HTTPException(400, "The audio file is empty.")
+    if len(audio) > config.MAX_AUDIO_BYTES:
+        raise HTTPException(413, "The audio file is too large. The limit is 10 MB.")
+    if not os.getenv("GEMINI_API_KEY"):
+        raise HTTPException(503, "GEMINI_API_KEY is not set on the backend. Add it to .env and restart.")
+
+    try:
+        text = await run_in_threadpool(voice.transcribe, audio, mime_type)
+    except Exception:
+        log.exception("[voice] transcription failed")
+        raise HTTPException(502, "The audio could not be transcribed. Please try again.")
+
+    log.info("[voice] transcribed %d bytes", len(audio))
+    return TranscriptResponse(text=text)
+
+
+@app.post("/api/v1/voice/speak")
+async def speak(request: SpeakRequest) -> Response:
+    try:
+        audio = await run_in_threadpool(voice.speak, request.text)
+    except Exception:
+        log.exception("[voice] speech synthesis failed")
+        raise HTTPException(502, "The reply could not be turned into speech.")
+    return Response(content=audio, media_type="audio/mpeg")

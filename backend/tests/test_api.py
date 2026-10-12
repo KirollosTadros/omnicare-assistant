@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from app import config
+from app import config, voice
 from app.main import app, get_graph_builder
 
 CLAIM_ARGS = {
@@ -192,6 +192,48 @@ def test_injection_attempt_is_refused(scripted_client):
     assert body["response"].startswith("Sorry, I can't help with that request.")
     assert body["tool_calls"] == []
     assert json.loads(config.CLAIMS_FILE.read_text())[1]["status"] == "Under Review"
+
+
+def test_transcribe_returns_the_transcript(client, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(voice, "transcribe", lambda audio, mime_type: f"{len(audio)} bytes of {mime_type}")
+
+    response = client.post(
+        "/api/v1/voice/transcribe", files={"file": ("question.webm", b"abc", "audio/webm;codecs=opus")}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"text": "3 bytes of audio/webm"}
+
+
+def test_transcribe_rejects_other_file_types(client):
+    response = client.post("/api/v1/voice/transcribe", files={"file": ("notes.txt", b"hello", "text/plain")})
+
+    assert response.status_code == 415
+
+
+def test_transcribe_rejects_large_files(client, monkeypatch):
+    monkeypatch.setattr(config, "MAX_AUDIO_BYTES", 10)
+
+    response = client.post("/api/v1/voice/transcribe", files={"file": ("question.wav", b"x" * 11, "audio/wav")})
+
+    assert response.status_code == 413
+
+
+def test_speak_returns_mp3_audio(client, monkeypatch):
+    monkeypatch.setattr(voice, "speak", lambda text: b"mp3-bytes")
+
+    response = client.post("/api/v1/voice/speak", json={"text": "Hello"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/mpeg"
+    assert response.content == b"mp3-bytes"
+
+
+def test_citations_and_markdown_are_not_spoken():
+    text = "Yes, **up to $25,000** [Section 1: Home Water Damage Coverage]. Flood is excluded [Section 1]."
+
+    assert voice.clean_for_speech(text) == "Yes, up to $25,000. Flood is excluded."
 
 
 @pytest.mark.integration

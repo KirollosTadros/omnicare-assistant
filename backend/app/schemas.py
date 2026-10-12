@@ -29,3 +29,11 @@ class ChatResponse(BaseModel):
     response: str
     sources: list[str]
     tool_calls: list[ToolCallInfo]
+
+
+class TranscriptResponse(BaseModel):
+    text: str
+
+
+class SpeakRequest(BaseModel):
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=5000)]
