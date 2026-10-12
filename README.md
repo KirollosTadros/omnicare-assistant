@@ -14,7 +14,7 @@ It refuses prompt-injection attempts before they reach the agent. The stack is a
 
 ## Quick start
 
-You need Docker with Compose and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+You need Docker with Compose v2.24 or newer (`docker compose version` shows the installed version) and a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
 
 **1. Add your API key**
 
