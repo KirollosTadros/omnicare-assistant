@@ -1,6 +1,6 @@
 # OmniCare Assistant
 
-**Demo video:** [docs/OmniCare-Demo.mp4](docs/OmniCare-Demo.mp4) is a screen recording of the assistant in use.
+**Demo video:** [docs/OmniCare-Demo.mp4](docs/OmniCare-Demo.mp4) is a screen recording of the assistant in use. It was recorded before claim and policy numbers without the `CLM-`/`POL-` prefix were accepted, so one scenario shows the assistant asking for the full format.
 
 A prototype customer assistant for OmniCare Financial, a fictional insurer. It does three things:
 
@@ -116,6 +116,15 @@ backend/app/
 ```
 
 `tools/` has no LangChain or LangGraph imports. The `@tool` wrapping happens only in `agent/lc_tools.py`, so the same functions can be tested directly and could be exposed another way later, for example through an MCP server.
+
+---
+
+## Built on my earlier projects
+
+This assistant reuses two of my earlier projects rather than starting from scratch:
+
+- **[DocuSense-AI](https://github.com/KirollosTadros/DocuSense-AI)**, a RAG app for chatting with PDF documents. The retrieval layer in `backend/app/rag/` is ported from it: the PDF reader, the word chunker, the sentence-transformers embeddings and the Chroma vector store. I added a Markdown reader, section-based chunking and chunk metadata so answers can cite the section they came from. Its agent loop, written directly on the `google-genai` SDK, was replaced by LangGraph.
+- **[Research-AI](https://github.com/KirollosTadros/Research-AI)**, a multi-agent research assistant built with LangGraph. The agent layer follows its patterns: the tool-calling loop with a round budget, `interrupt()` with a checkpointer for human-in-the-loop, Pydantic structured output, and the Streamlit chat UI with model selection. Its planner and parallel researchers weren't needed here, so the graph is a single agent with a guard in front of it.
 
 ---
 
