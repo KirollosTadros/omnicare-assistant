@@ -15,7 +15,7 @@ def search_policy(query: str) -> tuple[str, list[dict]]:
 
 @tool
 def get_claim_status(claim_id: str) -> dict:
-    """Look up an existing claim by its claim ID (for example CLM-8821).
+    """Look up an existing claim by its claim ID (for example CLM-8821). A bare number like 8821 is fine.
     Returns the claim record with its status and amount, or found=False if there is no such claim."""
     return claims.get_claim_status(claim_id)
 

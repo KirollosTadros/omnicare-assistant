@@ -62,7 +62,7 @@ Repeat step 8 and click **Cancel**. The assistant says the claim was cancelled, 
 
 ## 10. Invalid claim details
 
-Try: **File a claim on policy 1234 for -50 dollars, water damage, the pipe burst in my kitchen.**
+Try: **File a claim on policy 12 for -50 dollars, water damage, the pipe burst in my kitchen.**
 
 The assistant explains what is wrong with the policy number and the amount. There is no confirmation prompt, and the tool call is shown as rejected.
 

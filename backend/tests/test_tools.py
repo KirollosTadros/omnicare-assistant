@@ -34,15 +34,28 @@ def test_status_of_claim_under_review():
     assert result["claim_type"] == "Personal Property"
 
 
-def test_status_accepts_lower_case_and_spaces():
-    assert get_claim_status(" clm-8821 ")["found"] is True
+@pytest.mark.parametrize("claim_id", ["8821", "clm8821", "CLM 8821", " clm-8821 "])
+def test_status_accepts_the_formats_customers_use(claim_id):
+    result = get_claim_status(claim_id)
+
+    assert result["found"] is True
+    assert result["claim_id"] == "CLM-8821"
+    assert result["status"] == "Approved"
+
+
+@pytest.mark.parametrize("claim_id", ["abc", "POL-1092"])
+def test_status_rejects_ids_in_another_format(claim_id):
+    result = get_claim_status(claim_id)
+
+    assert result["found"] is False
+    assert "error" in result
 
 
 def test_unknown_claim_is_not_found():
     assert get_claim_status("CLM-0000") == {"found": False, "claim_id": "CLM-0000"}
 
 
-@pytest.mark.parametrize("claim_id", ["8821", "CLM-12", "CLM-ABCD", "POL-1092", "", "CLM-8821; DROP TABLE"])
+@pytest.mark.parametrize("claim_id", ["12", "CLM-12", "CLM-ABCD", "CLM--8821", "", "CLM-8821; DROP TABLE"])
 def test_malformed_claim_id_returns_an_error(claim_id):
     result = get_claim_status(claim_id)
 
@@ -78,7 +91,8 @@ def test_submitted_claims_get_consecutive_ids():
 @pytest.mark.parametrize(
     "field, value",
     [
-        ("policy_number", "1234"),
+        ("policy_number", "12"),
+        ("policy_number", "ABC-1234"),
         ("policy_number", "POL-12345"),
         ("claim_type", "Earthquake"),
         ("amount", -50),
@@ -98,7 +112,7 @@ def test_invalid_field_is_rejected_and_nothing_is_written(field, value):
 
 
 def test_all_invalid_fields_are_listed():
-    result = submit_claim(policy_number="1234", claim_type="Fire", amount=-1, description="short")
+    result = submit_claim(policy_number="12", claim_type="Fire", amount=-1, description="short")
 
     assert set(result["fields"]) == {"policy_number", "claim_type", "amount", "description"}
 
@@ -112,6 +126,14 @@ def test_claim_type_is_case_insensitive():
 
 def test_policy_number_is_case_insensitive():
     result = submit_claim(**{**VALID, "policy_number": " pol-1092 "})
+
+    assert result["policy_number"] == "POL-1092"
+    assert stored_claims()[2]["policy_number"] == "POL-1092"
+
+
+@pytest.mark.parametrize("policy_number", ["1092", "pol1092", "POL 1092"])
+def test_policy_number_accepts_the_formats_customers_use(policy_number):
+    result = submit_claim(**{**VALID, "policy_number": policy_number})
 
     assert result["policy_number"] == "POL-1092"
     assert stored_claims()[2]["policy_number"] == "POL-1092"

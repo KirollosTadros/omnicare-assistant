@@ -22,6 +22,14 @@ FIELD_HINTS = {
 _write_lock = threading.Lock()
 
 
+def normalise_id(value, prefix: str):
+    """Turns 8821, CLM8821, CLM 8821 and clm-8821 into CLM-8821. Anything else is returned unchanged."""
+    if not isinstance(value, str):
+        return value
+    match = re.fullmatch(rf"(?:{prefix}[ -]?)?(\d+)", value.strip().upper())
+    return f"{prefix}-{match.group(1)}" if match else value
+
+
 class ClaimSubmission(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -33,9 +41,7 @@ class ClaimSubmission(BaseModel):
     @field_validator("policy_number", mode="before")
     @classmethod
     def normalise_policy_number(cls, value):
-        if isinstance(value, str):
-            return value.strip().upper()
-        return value
+        return normalise_id(value, "POL")
 
     @field_validator("claim_type", mode="before")
     @classmethod
@@ -69,7 +75,7 @@ def _read_claims() -> list[dict]:
 
 
 def get_claim_status(claim_id: str) -> dict:
-    claim_id = str(claim_id).strip().upper()
+    claim_id = normalise_id(str(claim_id), "CLM")
     if not CLAIM_ID_PATTERN.match(claim_id):
         return {"found": False, "error": "Invalid claim ID. Claim IDs look like CLM-1234."}
 

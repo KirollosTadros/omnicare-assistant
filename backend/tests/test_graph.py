@@ -113,12 +113,12 @@ def test_anything_other_than_yes_counts_as_no(scripted_graph):
 def test_invalid_claim_never_asks_for_confirmation(scripted_graph):
     graph = scripted_graph(
         [
-            tool_call("submit_claim", {**CLAIM_ARGS, "policy_number": "1234", "amount": -50}),
+            tool_call("submit_claim", {**CLAIM_ARGS, "policy_number": "12", "amount": -50}),
             AIMessage("The policy number and amount need fixing."),
         ]
     )
 
-    result = ask(graph, "File a claim for policy 1234, amount -50", new_thread())
+    result = ask(graph, "File a claim for policy 12, amount -50", new_thread())
 
     assert "__interrupt__" not in result
     message = tool_messages(result)[0]
