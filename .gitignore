@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+chroma/
+.hf_cache/
+docker-compose.override.yml
+.pip-cache/*
+!.pip-cache/.gitkeep
