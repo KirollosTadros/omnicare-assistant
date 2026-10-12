@@ -1,5 +1,7 @@
 # OmniCare Assistant
 
+**Demo video:** [docs/OmniCare-Demo.mp4](docs/OmniCare-Demo.mp4) is a screen recording of the assistant in use.
+
 A prototype customer assistant for OmniCare Financial, a fictional insurer. It does three things:
 
 1. Answers policy coverage questions from `sample_policy.md` using RAG, and cites the section it used.
