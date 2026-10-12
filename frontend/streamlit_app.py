@@ -81,7 +81,8 @@ def ask_backend(text: str) -> dict:
 def transcribe(recording) -> str:
     files = {"file": (recording.name, recording.getvalue(), recording.type)}
     try:
-        response = requests.post(f"{BACKEND_URL}/api/v1/voice/transcribe", files=files, timeout=120)
+        data = {"model": st.session_state.model} if st.session_state.model else None
+        response = requests.post(f"{BACKEND_URL}/api/v1/voice/transcribe", files=files, data=data, timeout=120)
     except requests.RequestException:
         st.error("The backend is not reachable. Is it running?")
         return ""

@@ -6,9 +6,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
-from app.agent.llm import get_llm
+from app.agent.llm import DEFAULT_MODEL, get_llm
 from app.agent.state import AssistantState
-from app.config import GUARD_MODEL
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ def find_injection(text: str) -> str:
 
 
 class Guard:
-    def __init__(self, model: str = GUARD_MODEL):
+    def __init__(self, model: str = DEFAULT_MODEL):
         llm = get_llm(model)
         self.structured_llm = llm.with_structured_output(GuardVerdict)
 

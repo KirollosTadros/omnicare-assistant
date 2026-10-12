@@ -18,7 +18,6 @@ EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 # all-MiniLM-L6-v2 only reads about 256 tokens, so chunks are kept well under that
 CHUNK_SIZE = 100
 CHUNK_OVERLAP = 25
-GUARD_MODEL = os.getenv("GUARD_MODEL", "gemini-3.5-flash-lite")
 
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
 AUDIO_TYPES = ["audio/wav", "audio/x-wav", "audio/webm", "audio/mpeg"]

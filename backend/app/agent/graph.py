@@ -17,7 +17,7 @@ checkpointer = InMemorySaver()
 
 @lru_cache(maxsize=None)
 def build_graph(model: str = DEFAULT_MODEL):
-    guard = Guard()
+    guard = Guard(model)
     assistant = Assistant(model)
 
     graph = StateGraph(AssistantState)

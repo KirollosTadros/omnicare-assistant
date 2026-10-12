@@ -177,3 +177,24 @@ def test_conversation_is_kept_per_thread(scripted_graph):
     result = ask(graph, "Thanks", thread)
 
     assert [m.text for m in result["messages"]] == ["Hi", "Hello!", "Thanks", "You're welcome."]
+
+
+def test_guard_runs_on_the_selected_model(monkeypatch):
+    from app.agent import assistant, guard
+    from app.agent.graph import build_graph
+    from conftest import FakeChatModel
+
+    used = []
+
+    def fake_llm(model):
+        used.append(model)
+        return FakeChatModel(responses=[AIMessage("Hello!")])
+
+    monkeypatch.setattr(assistant, "get_llm", fake_llm)
+    monkeypatch.setattr(guard, "get_llm", fake_llm)
+    build_graph.cache_clear()
+
+    build_graph("picked-model")
+    build_graph.cache_clear()
+
+    assert used == ["picked-model", "picked-model"]

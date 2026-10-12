@@ -4,7 +4,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
@@ -140,7 +140,7 @@ async def chat(request: ChatRequest, builder=Depends(get_graph_builder)) -> Chat
 
 
 @app.post("/api/v1/voice/transcribe", response_model=TranscriptResponse)
-async def transcribe(file: UploadFile) -> TranscriptResponse:
+async def transcribe(file: UploadFile, model: str | None = Form(None)) -> TranscriptResponse:
     # browsers send types like "audio/webm;codecs=opus"
     mime_type = (file.content_type or "").split(";")[0].strip().lower()
     if mime_type not in config.AUDIO_TYPES:
@@ -153,9 +153,11 @@ async def transcribe(file: UploadFile) -> TranscriptResponse:
         raise HTTPException(413, "The audio file is too large. The limit is 10 MB.")
     if not os.getenv("GEMINI_API_KEY"):
         raise HTTPException(503, "GEMINI_API_KEY is not set on the backend. Add it to .env and restart.")
+    if model and model not in list_models():
+        raise HTTPException(422, "Unknown model.")
 
     try:
-        text = await run_in_threadpool(voice.transcribe, audio, mime_type)
+        text = await run_in_threadpool(voice.transcribe, audio, mime_type, model or DEFAULT_MODEL)
     except Exception:
         log.exception("[voice] transcription failed")
         raise HTTPException(502, "The audio could not be transcribed. Please try again.")

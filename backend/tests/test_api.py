@@ -263,7 +263,7 @@ def test_injection_attempt_is_refused(scripted_client):
 
 def test_transcribe_returns_the_transcript(client, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    monkeypatch.setattr(voice, "transcribe", lambda audio, mime_type: f"{len(audio)} bytes of {mime_type}")
+    monkeypatch.setattr(voice, "transcribe", lambda audio, mime_type, model: f"{len(audio)} bytes of {mime_type}")
 
     response = client.post(
         "/api/v1/voice/transcribe", files={"file": ("question.webm", b"abc", "audio/webm;codecs=opus")}
